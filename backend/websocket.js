@@ -1,53 +1,54 @@
-// websocket.js
 const WebSocket = require('ws');
 const admin = require('firebase-admin');
 
-const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIAL_JSON);
-
-
+// Inicializar Firebase Admin con credenciales
+// Cambia al nombre correcto de tu archivo JSON, con la ruta relativa correcta
+const serviceAccount = require('./websocket_server/notificationpush-f7da7-firebase-adminsdk-fbsvc-5c8770c6fe.json');
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
+  credential: admin.credential.cert(serviceAccount)
 });
 
+// Lista simple de tokens FCM (en producción, base de datos)
 const fcmTokens = [];
 
+// Crear servidor WebSocket (puedes pasar puerto/host desde afuera)
 let wss;
 
 function iniciarWebSocket(server) {
   wss = new WebSocket.Server({ server });
 
   wss.on('connection', (ws) => {
-    console.log('🟢 Cliente conectado al WebSocket');
+    console.log('🟢 Cliente conectado por WebSocket');
     ws.send('Conectado al WebSocket');
   });
 }
 
+// Función para enviar mensaje a todos por WebSocket
 function enviarNotificacionTodos(mensaje) {
   if (!wss) return;
 
-  wss.clients.forEach((client) => {
+  wss.clients.forEach(client => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(mensaje);
     }
   });
 }
 
-async function enviarNotificacionPushATodos(title, body) {
-  const mensajes = fcmTokens.map((token) => ({
+// Enviar notificaciones push FCM a todos los tokens guardados
+function enviarNotificacionPushATodos(title, body) {
+  const mensajes = fcmTokens.map(token => ({
     notification: { title, body },
     token,
   }));
 
-  for (const msg of mensajes) {
-    try {
-      const response = await admin.messaging().send(msg);
-      console.log('✅ Notificación push enviada:', response);
-    } catch (error) {
-      console.error('❌ Error enviando notificación push:', error);
-    }
-  }
+  mensajes.forEach(msg => {
+    admin.messaging().send(msg)
+      .then(response => console.log('✅ Notificación push enviada:', response))
+      .catch(error => console.error('❌ Error enviando notificación push:', error));
+  });
 }
 
+// Agregar token FCM (evitando duplicados)
 function agregarTokenFCM(token) {
   if (!fcmTokens.includes(token)) {
     fcmTokens.push(token);
@@ -57,6 +58,7 @@ function agregarTokenFCM(token) {
   }
 }
 
+// Exportar funciones para usarlas en server.js
 module.exports = {
   iniciarWebSocket,
   enviarNotificacionTodos,
