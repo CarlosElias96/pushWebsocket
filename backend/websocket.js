@@ -61,10 +61,7 @@ async function enviarNotificacionPushATodos(title, body) {
 
   console.log(`📲 Enviando notificación push a ${fcmTokens.length} dispositivos`);
 
-  // Copia de los tokens para no modificar la lista mientras iteras
-  const tokensActuales = [...fcmTokens];
-
-  for (const token of tokensActuales) {
+  for (const token of fcmTokens) {
     try {
       const response = await admin.messaging().send({
         notification: { title, body },
@@ -73,15 +70,6 @@ async function enviarNotificacionPushATodos(title, body) {
       console.log('✅ Notificación push enviada:', response);
     } catch (error) {
       console.error('❌ Error enviando notificación push:', error);
-
-      // ✅ Elimina el token inválido
-      if (error.code === 'messaging/registration-token-not-registered') {
-        const idx = fcmTokens.indexOf(token);
-        if (idx !== -1) {
-          fcmTokens.splice(idx, 1);
-          console.log('🗑️ Token inválido eliminado:', token);
-        }
-      }
     }
   }
 }
