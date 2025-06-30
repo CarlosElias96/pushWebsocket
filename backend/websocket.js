@@ -1,14 +1,16 @@
+// websocket.js
 const WebSocket = require('ws');
 const admin = require('firebase-admin');
 
 const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIAL_JSON);
+
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
 });
 
 const fcmTokens = [];
-const clientes = new Set();
+
 let wss;
 
 function iniciarWebSocket(server) {
@@ -16,41 +18,18 @@ function iniciarWebSocket(server) {
 
   wss.on('connection', (ws) => {
     console.log('🟢 Cliente conectado al WebSocket');
-    clientes.add(ws);
-    console.log(`📈 Total clientes conectados: ${clientes.size}`);
-
-    ws.send('✅ Conectado al WebSocket');
-
-    ws.on('close', () => {
-      clientes.delete(ws);
-      console.log('❌ Cliente desconectado');
-      console.log(`📉 Total clientes conectados: ${clientes.size}`);
-    });
-
-    ws.on('error', (err) => {
-      console.error('⚠️ Error en conexión WebSocket:', err);
-    });
-
-    ws.on('message', (msg) => {
-      console.log('📩 Mensaje recibido del cliente:', msg);
-    });
+    ws.send('Conectado al WebSocket');
   });
-
-  console.log('✅ WebSocket server iniciado y escuchando conexiones');
 }
 
 function enviarNotificacionTodos(mensaje) {
-  if (!wss) {
-    console.warn('⚠️ WebSocket no iniciado');
-    return;
-  }
+  if (!wss) return;
 
-  console.log(`📤 Enviando mensaje a ${clientes.size} clientes: ${mensaje}`);
-  for (const client of clientes) {
+  wss.clients.forEach((client) => {
     if (client.readyState === WebSocket.OPEN) {
       client.send(mensaje);
     }
-  }
+  });
 }
 
 async function enviarNotificacionPushATodos(title, body) {
@@ -68,7 +47,6 @@ async function enviarNotificacionPushATodos(title, body) {
     }
   }
 }
-
 
 function agregarTokenFCM(token) {
   if (!fcmTokens.includes(token)) {
