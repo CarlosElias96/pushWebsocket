@@ -1,54 +1,79 @@
 const WebSocket = require('ws');
 const admin = require('firebase-admin');
 
-// Inicializar Firebase Admin con credenciales
-// Cambia al nombre correcto de tu archivo JSON, con la ruta relativa correcta
-const serviceAccount = require('./websocket_server/notificationpush-f7da7-firebase-adminsdk-fbsvc-5c8770c6fe.json');
+const serviceAccount = JSON.parse(process.env.FIREBASE_CREDENTIAL_JSON);
+
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
-// Lista simple de tokens FCM (en producción, base de datos)
 const fcmTokens = [];
-
-// Crear servidor WebSocket (puedes pasar puerto/host desde afuera)
+const clientes = new Set();
 let wss;
 
 function iniciarWebSocket(server) {
   wss = new WebSocket.Server({ server });
 
   wss.on('connection', (ws) => {
-    console.log('🟢 Cliente conectado por WebSocket');
-    ws.send('Conectado al WebSocket');
+    console.log('🟢 Cliente conectado al WebSocket');
+    clientes.add(ws);
+    console.log(`📈 Total clientes conectados: ${clientes.size}`);
+
+    ws.send('✅ Conectado al WebSocket');
+
+    ws.on('close', () => {
+      clientes.delete(ws);
+      console.log('❌ Cliente desconectado');
+      console.log(`📉 Total clientes conectados: ${clientes.size}`);
+    });
+
+    ws.on('error', (err) => {
+      console.error('⚠️ Error en conexión WebSocket:', err);
+    });
+
+    ws.on('message', (msg) => {
+      console.log('📩 Mensaje recibido del cliente:', msg);
+    });
   });
+
+  console.log('✅ WebSocket server iniciado y escuchando conexiones');
 }
 
-// Función para enviar mensaje a todos por WebSocket
 function enviarNotificacionTodos(mensaje) {
-  if (!wss) return;
+  if (!wss) {
+    console.warn('⚠️ WebSocket no iniciado');
+    return;
+  }
 
-  wss.clients.forEach(client => {
+  console.log(`📤 Enviando mensaje a ${clientes.size} clientes: ${mensaje}`);
+  for (const client of clientes) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(mensaje);
     }
-  });
+  }
 }
 
-// Enviar notificaciones push FCM a todos los tokens guardados
-function enviarNotificacionPushATodos(title, body) {
-  const mensajes = fcmTokens.map(token => ({
-    notification: { title, body },
-    token,
-  }));
+async function enviarNotificacionPushATodos(title, body) {
+  if (fcmTokens.length === 0) {
+    console.warn('⚠️ No hay tokens FCM registrados');
+    return;
+  }
 
-  mensajes.forEach(msg => {
-    admin.messaging().send(msg)
-      .then(response => console.log('✅ Notificación push enviada:', response))
-      .catch(error => console.error('❌ Error enviando notificación push:', error));
-  });
+  console.log(`📲 Enviando notificación push a ${fcmTokens.length} dispositivos`);
+
+  for (const token of fcmTokens) {
+    try {
+      const response = await admin.messaging().send({
+        notification: { title, body },
+        token,
+      });
+      console.log('✅ Notificación push enviada:', response);
+    } catch (error) {
+      console.error('❌ Error enviando notificación push:', error);
+    }
+  }
 }
 
-// Agregar token FCM (evitando duplicados)
 function agregarTokenFCM(token) {
   if (!fcmTokens.includes(token)) {
     fcmTokens.push(token);
@@ -58,7 +83,6 @@ function agregarTokenFCM(token) {
   }
 }
 
-// Exportar funciones para usarlas en server.js
 module.exports = {
   iniciarWebSocket,
   enviarNotificacionTodos,
