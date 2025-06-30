@@ -54,25 +54,21 @@ function enviarNotificacionTodos(mensaje) {
 }
 
 async function enviarNotificacionPushATodos(title, body) {
-  if (fcmTokens.length === 0) {
-    console.warn('⚠️ No hay tokens FCM registrados');
-    return;
-  }
+  const mensajes = fcmTokens.map((token) => ({
+    notification: { title, body },
+    token,
+  }));
 
-  console.log(`📲 Enviando notificación push a ${fcmTokens.length} dispositivos`);
-
-  for (const token of fcmTokens) {
+  for (const msg of mensajes) {
     try {
-      const response = await admin.messaging().send({
-        notification: { title, body },
-        token,
-      });
+      const response = await admin.messaging().send(msg);
       console.log('✅ Notificación push enviada:', response);
     } catch (error) {
       console.error('❌ Error enviando notificación push:', error);
     }
   }
 }
+
 
 function agregarTokenFCM(token) {
   if (!fcmTokens.includes(token)) {
