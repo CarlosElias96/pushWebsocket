@@ -64,8 +64,14 @@ async function enviarNotificacionPushATodos(title, body) {
   for (const token of fcmTokens) {
     try {
       const response = await admin.messaging().send({
-        notification: { title, body },
         token,
+        notification: {
+          title: 'Notificación FCM',
+          body: '¡Contenido del mensaje!',
+        },
+        data: {
+          extraData: 'valor'
+        }
       });
       console.log('✅ Notificación push enviada:', response);
     } catch (error) {
